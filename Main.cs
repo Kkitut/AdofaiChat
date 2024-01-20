@@ -5,6 +5,9 @@ using System.Threading;
 using System;
 using static UnityModManagerNet.UnityModManager.ModEntry;
 using System.Net.Sockets;
+using System.Collections.Generic;
+using System.IO;
+using Newtonsoft.Json;
 
 public class Main
 {
@@ -17,7 +20,7 @@ public class Main
     private static string sendMessage = "";
     private static string eipAddress = "";
     private static string AllMessages = "";
-    private static string infostr = "<color=#FF0000>해제됨</color>";
+    private static string infostr = "<color=#FF0000>Disconnected</color>";
     private static string formattedTime = "<color=#808080>" + DateTime.Now.ToString("HH:mm") + "</color>";
     private static string username = "";
     private static string usernametemp = "";
@@ -44,12 +47,12 @@ public class Main
                         client?.Close();
                         isRunning = false;
                         clientsCount = 0;
-                        infostr = "<color=#FF0000>해제됨</color>";
-                        AllMessages = "\n" + formattedTime + " <i>[상태] " + infostr + "</i>" + AllMessages;
+                        infostr = "<color=#FF0000>Disconnected</color>";
+                        AllMessages = "\n" + formattedTime + " <i>[Info] " + infostr + "</i>" + AllMessages;
                     }
                     catch(Exception e)
                     {
-                        infostr = "해제중 오류: " + e.Message;
+                        infostr = "Error disconnecting: " + e.Message;
                     }
                 }
             }
@@ -61,12 +64,12 @@ public class Main
         {
             formattedTime = "<color=#808080>" + DateTime.Now.ToString("HH:mm") + "</color>";
             GUILayout.BeginHorizontal();
-            if(GUILayout.Button("전송",GUILayout.Width(60)))
+            if(GUILayout.Button("Send",GUILayout.Width(80)))
             {
                 SendMessage(client,sendMessage);
                 if(sendMessage != "")
                 {
-                    AllMessages = "\n" + formattedTime + " <b>" + username + "(나):</b> " + sendMessage + AllMessages;
+                    AllMessages = "\n" + formattedTime + " <b>" + username + "(Me):</b> " + sendMessage + AllMessages;
                     sendMessage = "";
                 }
             }
@@ -75,14 +78,14 @@ public class Main
             if(sendMessage != "" && isRunning && Event.current.isKey && Event.current.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() == "MessageField")
             {
                 SendMessage(client,sendMessage);
-                AllMessages = "\n" + formattedTime + " <b>" + username + "(나):</b> " + sendMessage + AllMessages;
+                AllMessages = "\n" + formattedTime + " <b>" + username + "(Me):</b> " + sendMessage + AllMessages;
                 sendMessage = "";
             }
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("이름:",GUILayout.Width(0));
-            if(GUILayout.Button("적용",GUILayout.Width(60)))
+            GUILayout.Label("Name:",GUILayout.Width(0));
+            if(GUILayout.Button("Apply",GUILayout.Width(120)))
             {
                 username = usernametemp;
                 SendMessage(client,"{username:"+username+"}");
@@ -92,49 +95,47 @@ public class Main
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if(!isRunning && GUILayout.Button("접속",GUILayout.Width(80)))
+            if(!isRunning && GUILayout.Button("Connect",GUILayout.Width(180)))
             {
                 try
                 {
                     TryConnect();
                     isRunning = true;
-                    infostr = "<color=#00FF00>접속됨</color>";
+                    infostr = "<color=#00FF00>Connected</color>";
                     SendMessage(client,"{username:" + username + "}");
-                    AllMessages = "\n" + formattedTime + " <i>[상태] " + infostr + "</i>" + AllMessages;
+                    AllMessages = "\n" + formattedTime + " <i>[Info] " + infostr + "</i>" + AllMessages;
                 }
                 catch(Exception e)
                 {
-                    infostr = "접속중 오류: " + e.Message;
+                    infostr = "Error connecting: " + e.Message;
                 }
             }
-            if(isRunning && GUILayout.Button("해제",GUILayout.Width(80)))
+            if(isRunning && GUILayout.Button("Disconnect",GUILayout.Width(180)))
             {
                 try
                 {
                     client?.Close();
                     isRunning = false;
                     clientsCount = 0;
-                    infostr = "<color=#FF0000>해제됨</color>";
-                    AllMessages = "\n" + formattedTime + " <i>[상태] " + infostr + "</i>" + AllMessages;
+                    infostr = "<color=#FF0000>Disconnected</color>";
+                    AllMessages = "\n" + formattedTime + " <i>[Info] " + infostr + "</i>" + AllMessages;
                 }
                 catch(Exception e)
                 {
-                    infostr = "해제중 오류: " + e.Message;
+                    infostr = "Error disconnecting: " + e.Message;
                 }
                 
             }
-            GUILayout.Label("서버주소:",GUILayout.Width(0));
+            GUILayout.Label("Address:",GUILayout.Width(0));
             eipAddress = GUILayout.TextField(eipAddress);
             GUILayout.EndHorizontal();
-            GUILayout.Label("상태: " + infostr);
-            GUILayout.Label("접속자 수: " + clientsCount);
-            // 메시지 비우기 버튼
-            if(GUILayout.Button("비우기",GUILayout.Width(80)))
+            GUILayout.Label("Info: " + infostr);
+            GUILayout.Label("UserCount: " + clientsCount);
+            if(GUILayout.Button("Clear",GUILayout.Width(100)))
             {
                 AllMessages = "";
             }
-            // 수신된 메시지를 표시
-            GUILayout.Label("메시지:");
+            GUILayout.Label("Message:");
             GUILayout.Label(AllMessages);
         };
 
@@ -148,15 +149,13 @@ public class Main
             try
             {
                 client = new TcpClient(eipAddress,3302);
-                infostr = "연결됨";
-
-                // 클라이언트에서 메시지 수신을 담당하는 스레드 시작
+                infostr = "Connected";
                 Thread receiveThread = new Thread(new ParameterizedThreadStart(ReceiveMessages));
                 receiveThread.Start(client);
             }
             catch(Exception e)
             {
-                infostr = ("오류: " + e.Message + "\n 접속시도 IP:" + eipAddress);
+                infostr = ("Error: " + e.Message);
             }
         }
     }
@@ -173,24 +172,16 @@ public class Main
         {
             bytesRead = 0;
 
-            try
-            {
-                bytesRead = clientStream.Read(message,0,4096);
-            }
-            catch
-            {
-                break;
-            }
+            try { bytesRead = clientStream.Read(message,0,4096); }
+            catch { break; }
 
             if(bytesRead == 0)
                 break;
 
             string receivedMessage = Encoding.UTF8.GetString(message,0,bytesRead);
 
-            // 서버에서 클라이언트 수를 저장
             if(receivedMessage.StartsWith("{") && receivedMessage.EndsWith("}"))
             {
-                // 파싱 예시: {clientscount:4}
                 string[] parts = receivedMessage.Trim('{','}').Split(':');
                 if(parts.Length == 2 && parts[0].Trim().ToLower() == "clientscount")
                 {
@@ -202,8 +193,6 @@ public class Main
                     }
                 }
             }
-
-            // 파싱 실패한 경우 메시지 기록
             AllMessages = "\n" + formattedTime + " " + receivedMessage + AllMessages;
         }
     }
@@ -218,6 +207,7 @@ public class Main
             stream.Flush();
         }
     }
+
 }
 
 public class RandomStringGenerator
